@@ -19,74 +19,84 @@
       // Establish connection
       const socket = io();
       socket.on("remoteObject", async (remoteObject) => {
-        // Define ws fn calls
+        // Define ws fn exchange for vanilla objects
+        const vanillaExchange = (fieldName, resolve, reject) => {
+          socket.emit("vanillaField", fieldName);
+          socket.on("vanillaFieldResponse", (response) => {
+            fieldName === "fieldC"
+              ? resolve(new RegExp(response))
+              : resolve(response);
+          });
+          socket.on("vanillaFieldResponseErr", (err) => {
+            reject(err);
+          });
+        };
+
+        // Define ws fn exchange for first order fns
+        const firstOrderFunctionExchange = (arg, resolve, reject) => {
+          socket.emit("functionField", { functionName: "someMethod", arg });
+          socket.on("functionFieldResponse", (response) => {
+            resolve(response);
+          });
+          socket.on("functionFieldResponseErr", (err) => {
+            reject(err);
+          });
+        };
+
+        // Define ws fn exchange for higher order fns
+        const higherOrderFunctionExchange = (arg, resolve, reject) => {
+          socket.emit("higherOrderFunctionField", {
+            functionName: "someMethodReturningAFunction",
+          });
+          socket.on("higherOrderFunctionFieldResponse", () => {
+            resolve(
+              (arg) =>
+                // Note: Return promise that will resolve to the result of
+                // the partially called function attached to the remote
+                // object on server
+                new Promise((resolveDash, rejectDash) => {
+                  socket.emit("partialCalledFuncField", {
+                    functionName: "partialCalledFunc",
+                    arg,
+                  });
+                  socket.on("partialCalledFuncResponse", (response) => {
+                    resolveDash(response);
+                  });
+                })
+            );
+          });
+        };
+
         const remoteObj = {
           fieldA: () =>
             new Promise((resolve, reject) => {
-              socket.emit("vanillaField", "fieldA");
-              socket.on("vanillaFieldResponse", (response) => {
-                resolve(response);
-              });
-              socket.on("vanillaFieldResponseErr", (err) => {
-                reject(err);
-              });
+              vanillaExchange("fieldA", resolve, reject);
             }),
+
           fieldB: () =>
             new Promise((resolve, reject) => {
-              socket.emit("vanillaField", "fieldB");
-              socket.on("vanillaFieldResponse", (response) => {
-                resolve(response);
-              });
-              socket.on("vanillaFieldResponseErr", (err) => {
-                reject(err);
-              });
+              vanillaExchange("fieldB", resolve, reject);
             }),
+
           fieldC: () =>
             new Promise((resolve, reject) => {
-              socket.emit("vanillaField", "fieldC");
-              socket.on("vanillaFieldResponse", (response) => {
-                resolve(new RegExp(response));
-              });
-              socket.on("vanillaFieldResponseErr", (err) => {
-                reject(err);
-              });
+              vanillaExchange("fieldC", resolve, reject);
             }),
+
           someMethod: (arg) =>
             new Promise((resolve, reject) => {
-              socket.emit("functionField", { functionName: "someMethod", arg });
-              socket.on("functionFieldResponse", (response) => {
-                resolve(response);
-              });
-              socket.on("functionFieldResponseErr", (err) => {
-                reject(err);
-              });
+              firstOrderFunctionExchange(arg, resolve, reject);
             }),
 
           someMethodReturningAFunction: () =>
             new Promise((resolve, reject) => {
-              socket.emit("higherOrderFunctionField", {
-                functionName: "someMethodReturningAFunction",
-              });
-              socket.on("functionFieldResponse", (funcResponse) => {
-                resolve(
-                  (arg) =>
-                    new Promise((resolveDash, rejectDash) => {
-                      socket.emit("partialCalledFuncField", {
-                        functionName: "partialCalledFunc",
-                        arg,
-                      });
-                      socket.on("partialCalledFuncResponse", (response) => {
-                        resolveDash(response);
-                      });
-                    })
-                );
-              });
+              higherOrderFunctionExchange(undefined, resolve, reject);
             }),
         };
         try {
           console.log(await remoteObj.fieldA());
           console.log(await remoteObj.fieldB());
-          // TODO: RegExp error
+          // TODO: RegExp error. Conversion to
           const fieldCResponse = await remoteObj.fieldC();
           console.log({ fieldCResponse });
           console.log("123".match(await remoteObj.fieldC()));
@@ -94,8 +104,9 @@
           const remoteFunction = await remoteObj.someMethodReturningAFunction();
           const remoteFunctionResponse = await remoteFunction(5);
           console.log(await remoteFunction(5));
+          // Extra check
           const remoteFunctionResponse2 = await remoteFunction(115);
-          console.log((await remoteFunction(115)) === 238);
+          console.log(await remoteFunction(115));
         } catch (e) {
           console.log(e);
         }

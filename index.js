@@ -45,8 +45,8 @@ io.on("connection", (socket) => {
     // Augment remote object with partially called function
     const partialCalledFunc = func(arg);
     remoteObject.partialCalledFunc = partialCalledFunc;
-    let response = func();
-    socket.emit("functionFieldResponse", response);
+    // Inform client partial function created
+    socket.emit("higherOrderFunctionFieldResponse");
   });
 
   // call partiallyCalledFunctions
