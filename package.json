@@ -1,0 +1,11 @@
+{
+  "name": "matterway",
+  "version": "0.0.1",
+  "description": "challenge",
+  "dependencies": {
+    "express": "^4.17.1",
+    "socket.io": "^3.1.1"
+  },
+  "scripts": {"start": "node index.js"}
+
+}

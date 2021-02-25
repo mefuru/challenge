@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      body {
+        margin: 10;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Websocket implementation</h1>
+    <h2>Context B</h2>
+    <p>Pls open console to see interactions with server and answers</p>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      // Establish connection
+      const socket = io();
+      socket.on("remoteObject", async (remoteObject) => {
+        // Define ws fn calls
+        const remoteObj = {
+          fieldA: () =>
+            new Promise((resolve, reject) => {
+              socket.emit("vanillaField", "fieldA");
+              socket.on("vanillaFieldResponse", (response) => {
+                resolve(response);
+              });
+              socket.on("vanillaFieldResponseErr", (err) => {
+                reject(err);
+              });
+            }),
+          fieldB: () =>
+            new Promise((resolve, reject) => {
+              socket.emit("vanillaField", "fieldB");
+              socket.on("vanillaFieldResponse", (response) => {
+                resolve(response);
+              });
+              socket.on("vanillaFieldResponseErr", (err) => {
+                reject(err);
+              });
+            }),
+          fieldC: () =>
+            new Promise((resolve, reject) => {
+              socket.emit("vanillaField", "fieldC");
+              socket.on("vanillaFieldResponse", (response) => {
+                resolve(new RegExp(response));
+              });
+              socket.on("vanillaFieldResponseErr", (err) => {
+                reject(err);
+              });
+            }),
+          someMethod: (arg) =>
+            new Promise((resolve, reject) => {
+              socket.emit("functionField", { functionName: "someMethod", arg });
+              socket.on("functionFieldResponse", (response) => {
+                resolve(response);
+              });
+              socket.on("functionFieldResponseErr", (err) => {
+                reject(err);
+              });
+            }),
+
+          someMethodReturningAFunction: () =>
+            new Promise((resolve, reject) => {
+              socket.emit("higherOrderFunctionField", {
+                functionName: "someMethodReturningAFunction",
+              });
+              socket.on("functionFieldResponse", (funcResponse) => {
+                resolve(
+                  (arg) =>
+                    new Promise((resolveDash, rejectDash) => {
+                      socket.emit("partialCalledFuncField", {
+                        functionName: "partialCalledFunc",
+                        arg,
+                      });
+                      socket.on("partialCalledFuncResponse", (response) => {
+                        resolveDash(response);
+                      });
+                    })
+                );
+              });
+            }),
+        };
+        try {
+          console.log(await remoteObj.fieldA());
+          console.log(await remoteObj.fieldB());
+          // TODO: RegExp error
+          const fieldCResponse = await remoteObj.fieldC();
+          console.log({ fieldCResponse });
+          console.log("123".match(await remoteObj.fieldC()));
+          console.log(await remoteObj.someMethod(5));
+          const remoteFunction = await remoteObj.someMethodReturningAFunction();
+          const remoteFunctionResponse = await remoteFunction(5);
+          console.log(await remoteFunction(5));
+          const remoteFunctionResponse2 = await remoteFunction(115);
+          console.log((await remoteFunction(115)) === 238);
+        } catch (e) {
+          console.log(e);
+        }
+      });
+    </script>
+  </body>
+</html>
